@@ -228,7 +228,7 @@ function render(timestamp, frame) {
       const baseHeight = stone.userData.baseHeight;
 
       // außen etwas schneller → wirkt „strudeliger“
-      const speed = 0.4 + radius * 0.6;
+      const speed = 0.2 + radius * 0.4;
       const angle = baseAngle + t * speed;
 
       const x = Math.cos(angle) * radius;
@@ -244,4 +244,5 @@ function render(timestamp, frame) {
 
   renderer.render(scene, camera);
 }
+
 
