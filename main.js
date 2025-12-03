@@ -74,7 +74,6 @@ function init() {
 
   // AR-Button OHNE hit-test
   const arButton = ARButton.createButton(renderer);
-  // optional etwas hübscher machen:
   arButton.style.position = 'fixed';
   arButton.style.bottom = '20px';
   arButton.style.left = '50%';
@@ -106,7 +105,7 @@ function onWindowResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// Spiral-Gruppe mit deinem Modell
+// Spiral-Gruppe mit deinem Modell + Animations-Daten
 function createStoneSpiral() {
   const group = new THREE.Group();
 
@@ -126,6 +125,8 @@ function createStoneSpiral() {
   let radius = 0;
   const angleStepRad = (angleStepDeg * Math.PI) / 180;
 
+  const stones = [];
+
   for (let i = 0; i < stoneCount; i++) {
     const x = Math.cos(angleRad) * radius;
     const z = Math.sin(angleRad) * radius;
@@ -138,15 +139,25 @@ function createStoneSpiral() {
       stone = new THREE.Mesh(fallbackGeometry, fallbackMaterial);
     }
 
+    // Basis-Position setzen
     stone.position.set(x, y, z);
     stone.rotation.y = (Math.random() - 0.5) * Math.PI;
+
+    // Animations-Daten speichern
+    stone.userData.baseAngle = angleRad;
+    stone.userData.radius = radius;
+    stone.userData.baseHeight = y;
+
     group.add(stone);
+    stones.push(stone);
 
     angleRad += angleStepRad;
     radius += radiusStep;
   }
 
-  // KEINE Rotation mehr am gesamten Strudel
+  // Stones im userData speichern, damit wir sie im render() animieren können
+  group.userData.stones = stones;
+
   return group;
 }
 
@@ -180,7 +191,7 @@ function placeSpiralInFrontOfCamera(distance = 1.2) {
   debug('Strudel vor Kamera platziert (Distanz: ' + distance + 'm).');
 }
 
-// wird bei Tap im AR-Modus ausgelöst
+// wird bei Tap im AR-Modus ausgelöst → Strudel neu vor die Kamera setzen
 function onSelect() {
   if (!stoneModel) {
     debug('Tap ignoriert: Modell noch nicht geladen.');
@@ -207,5 +218,30 @@ function render(timestamp, frame) {
     debug('Strudel automatisch beim Start vor Kamera platziert.');
   }
 
+  // 🔥 Strudel-Animation: einzelne Steine bewegen sich
+  if (stoneSpiral && stoneSpiral.userData.stones) {
+    const t = timestamp / 1000; // ms → Sekunden
+
+    stoneSpiral.userData.stones.forEach((stone, index) => {
+      const baseAngle = stone.userData.baseAngle;
+      const radius = stone.userData.radius;
+      const baseHeight = stone.userData.baseHeight;
+
+      // außen etwas schneller → wirkt „strudeliger“
+      const speed = 0.4 + radius * 0.6;
+      const angle = baseAngle + t * speed;
+
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      const y = baseHeight + Math.sin(t * 2 + index * 0.3) * 0.01; // leichtes Wabern
+
+      stone.position.set(x, y, z);
+
+      // optional: jeder Stein dreht sich leicht um sich selbst
+      stone.rotation.y += 0.01;
+    });
+  }
+
   renderer.render(scene, camera);
 }
+
