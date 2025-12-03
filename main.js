@@ -218,7 +218,7 @@ function render(timestamp, frame) {
     debug('Strudel automatisch beim Start vor Kamera platziert.');
   }
 
-  // 🔥 Strudel-Animation: einzelne Steine bewegen sich
+  // Strudel-Animation: einzelne Steine bewegen sich
   if (stoneSpiral && stoneSpiral.userData.stones) {
     const t = timestamp / 1000; // ms → Sekunden
 
@@ -244,6 +244,7 @@ function render(timestamp, frame) {
 
   renderer.render(scene, camera);
 }
+
 
 
 
