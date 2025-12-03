@@ -22,7 +22,7 @@ function init() {
   // Szene & Kamera
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(
-    70, // wenn du "zoom" kleiner willst: z.B. 50 oder 40 probieren
+    70, // "Zoom" -> kleiner = mehr Weitwinkel, z.B. 50 oder 40
     window.innerWidth / window.innerHeight,
     0.01,
     20
@@ -135,7 +135,7 @@ function createStoneSpiral() {
     radius += radiusStep;
   }
 
-  group.userData.rotate = true;
+  // group.userData.rotate = true; // brauchen wir nicht mehr
   return group;
 }
 
@@ -150,7 +150,7 @@ function placeSpiralAtReticle() {
 
   if (!stoneSpiral) {
     stoneSpiral = createStoneSpiral();
-    stoneSpiral.scale.set(0.3, 0.3, 0.3); // "Zoom" des Strudels
+    stoneSpiral.scale.set(0.3, 0.3, 0.3); // Größe des Strudels
     scene.add(stoneSpiral);
     debug('Strudel erzeugt.');
   }
@@ -211,9 +211,14 @@ function render(timestamp, frame) {
     }
   }
 
-  if (stoneSpiral && stoneSpiral.userData.rotate) {
-    stoneSpiral.rotation.y += 0.4 * (1 / 60);
-  }
+  // 🔥 KEINE Rotation mehr:
+  // if (stoneSpiral && stoneSpiral.userData.rotate) {
+  //   stoneSpiral.rotation.y += 0.4 * (1 / 60);
+  // }
 
   renderer.render(scene, camera);
 }
+
+  renderer.render(scene, camera);
+}
+
