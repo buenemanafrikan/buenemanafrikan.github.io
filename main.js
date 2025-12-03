@@ -3,17 +3,18 @@ import { ARButton } from './libs/ARButton.js';
 import { GLTFLoader } from './libs/GLTFLoader.js';
 
 let camera, scene, renderer;
-let hitTestSource = null;
-let hitTestSourceRequested = false;
-let reticle = null;
 let stoneSpiral = null;
 let stoneModel = null;
+
+// Hilfsvektoren für Positionierung vor der Kamera
+const tmpPos = new THREE.Vector3();
+const tmpDir = new THREE.Vector3();
+
+let initialPlaced = false; // ob der Strudel schon einmal automatisch gesetzt wurde
 
 function debug(msg) {
   console.log('[AR]', msg);
 }
-
-debug('main.js geladen');
 
 init();
 animate();
@@ -24,7 +25,7 @@ function init() {
   // Szene & Kamera
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(
-    70, // kleiner (z.B. 50) = mehr Weitwinkel
+    70, // kleiner = mehr Weitwinkel (z.B. 50 testen)
     window.innerWidth / window.innerHeight,
     0.01,
     20
@@ -71,19 +72,9 @@ function init() {
     }
   );
 
-  // WebXR Check
-  if (!navigator.xr) {
-    debug('navigator.xr NICHT verfügbar – keine WebXR-AR-Session möglich.');
-  } else {
-    debug('navigator.xr ist verfügbar.');
-  }
-
-  // AR-Button MIT Hit-Test
-  const arButton = ARButton.createButton(renderer, {
-    requiredFeatures: ['hit-test']
-  });
-
-  // Sicherstellen, dass der Button sichtbar ist
+  // AR-Button OHNE hit-test
+  const arButton = ARButton.createButton(renderer);
+  // optional etwas hübscher machen:
   arButton.style.position = 'fixed';
   arButton.style.bottom = '20px';
   arButton.style.left = '50%';
@@ -95,22 +86,14 @@ function init() {
   arButton.style.fontWeight = '600';
   arButton.style.zIndex = '20';
   arButton.style.cursor = 'pointer';
-
-  debug('ARButton erstellt:', arButton);
   document.body.appendChild(arButton);
-  debug('ARButton ans DOM gehängt.');
+  debug('ARButton erstellt.');
 
-  // Reticle
-  const reticleGeo = new THREE.RingGeometry(0.06, 0.07, 32).rotateX(-Math.PI / 2);
-  const reticleMat = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    side: THREE.DoubleSide
-  });
-  reticle = new THREE.Mesh(reticleGeo, reticleMat);
-  reticle.matrixAutoUpdate = false;
-  reticle.visible = false;
-  scene.add(reticle);
-  debug('Reticle erstellt.');
+  // XR-Controller für Taps (select-Event im AR-Modus)
+  const controller = renderer.xr.getController(0);
+  controller.addEventListener('select', onSelect);
+  scene.add(controller);
+  debug('XR-Controller registriert.');
 
   window.addEventListener('resize', onWindowResize);
 
@@ -163,30 +146,50 @@ function createStoneSpiral() {
     radius += radiusStep;
   }
 
+  // KEINE Rotation mehr am gesamten Strudel
   return group;
 }
 
-// Strudel einmalig auf Reticle setzen
-function placeSpiralAtReticle() {
-  if (!reticle) return;
-
-  const m = reticle.matrix;
-  const position = new THREE.Vector3();
-  const quaternion = new THREE.Quaternion();
-  const scale = new THREE.Vector3();
-
-  m.decompose(position, quaternion, scale);
-
+// dafür sorgen, dass wir eine Spiral-Gruppe haben
+function ensureStoneSpiral() {
   if (!stoneSpiral) {
     stoneSpiral = createStoneSpiral();
     stoneSpiral.scale.set(0.3, 0.3, 0.3); // Größe des Strudels
     scene.add(stoneSpiral);
     debug('Strudel erzeugt.');
   }
+}
 
-  stoneSpiral.position.copy(position);
-  stoneSpiral.quaternion.copy(quaternion);
-  debug('Strudel platziert.');
+// Strudel in bestimmter Entfernung vor der Kamera platzieren
+function placeSpiralInFrontOfCamera(distance = 1.2) {
+  if (!stoneSpiral) return;
+
+  const xrCamera = renderer.xr.getCamera(camera);
+
+  // Weltposition der Kamera
+  xrCamera.getWorldPosition(tmpPos);
+
+  // Blickrichtung (vorne)
+  tmpDir.set(0, 0, -1).applyQuaternion(xrCamera.quaternion).normalize();
+
+  // distance Meter vor die Kamera
+  tmpPos.add(tmpDir.multiplyScalar(distance));
+
+  stoneSpiral.position.copy(tmpPos);
+
+  debug('Strudel vor Kamera platziert (Distanz: ' + distance + 'm).');
+}
+
+// wird bei Tap im AR-Modus ausgelöst
+function onSelect() {
+  if (!stoneModel) {
+    debug('Tap ignoriert: Modell noch nicht geladen.');
+    return;
+  }
+
+  ensureStoneSpiral();
+  placeSpiralInFrontOfCamera(1.2);
+  debug('Strudel per Tap neu vor Kamera gesetzt.');
 }
 
 function animate() {
@@ -196,51 +199,13 @@ function animate() {
 function render(timestamp, frame) {
   const session = renderer.xr.getSession();
 
-  if (frame && session) {
-    const referenceSpace = renderer.xr.getReferenceSpace();
-
-    if (!hitTestSourceRequested) {
-      session.requestReferenceSpace('viewer').then((viewerSpace) => {
-        session
-          .requestHitTestSource({ space: viewerSpace })
-          .then((source) => {
-            hitTestSource = source;
-            debug('Hit-Test-Source eingerichtet.');
-          })
-          .catch((e) => debug('Fehler bei requestHitTestSource: ' + e));
-      });
-
-      session.addEventListener('end', () => {
-        hitTestSourceRequested = false;
-        hitTestSource = null;
-        debug('XR-Session beendet, Hit-Test reset.');
-      });
-
-      hitTestSourceRequested = true;
-    }
-
-    if (hitTestSource) {
-      const hitTestResults = frame.getHitTestResults(hitTestSource);
-
-      if (hitTestResults.length > 0) {
-        const hit = hitTestResults[0];
-        const pose = hit.getPose(referenceSpace);
-
-        reticle.visible = true;
-        reticle.matrix.fromArray(pose.transform.matrix);
-
-        // Sobald wir das ERSTE MAL einen Hit haben & Modell geladen ist → Strudel einmalig platzieren
-        if (!stoneSpiral && stoneModel) {
-          placeSpiralAtReticle();
-          debug('Strudel automatisch beim ersten Hit platziert.');
-        }
-      } else {
-        reticle.visible = false;
-      }
-    }
+  // Wenn AR läuft und Modell geladen, aber Strudel noch nie gesetzt → einmal automatisch vor Kamera platzieren
+  if (session && stoneModel && !initialPlaced) {
+    ensureStoneSpiral();
+    placeSpiralInFrontOfCamera(1.2);
+    initialPlaced = true;
+    debug('Strudel automatisch beim Start vor Kamera platziert.');
   }
 
-  // KEINE Rotation mehr
   renderer.render(scene, camera);
 }
-
