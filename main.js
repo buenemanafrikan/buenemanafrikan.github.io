@@ -10,8 +10,10 @@ let stoneSpiral = null;
 let stoneModel = null;
 
 function debug(msg) {
-  console.log(msg);
+  console.log('[AR]', msg);
 }
+
+debug('main.js geladen');
 
 init();
 animate();
@@ -22,7 +24,7 @@ function init() {
   // Szene & Kamera
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(
-    70, // "Zoom" -> kleiner = mehr Weitwinkel, z.B. 50 oder 40
+    70, // kleiner (z.B. 50) = mehr Weitwinkel
     window.innerWidth / window.innerHeight,
     0.01,
     20
@@ -34,6 +36,7 @@ function init() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
+  debug('Renderer angehängt.');
 
   // Licht
   const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
@@ -43,6 +46,7 @@ function init() {
   const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
   dirLight.position.set(1, 2, 1);
   scene.add(dirLight);
+  debug('Licht gesetzt.');
 
   // Modell laden
   const loader = new GLTFLoader();
@@ -59,7 +63,7 @@ function init() {
       });
 
       stoneModel.scale.set(0.05, 0.05, 0.05);
-      debug('Planet3.glb geladen');
+      debug('Planet3.glb geladen.');
     },
     undefined,
     (error) => {
@@ -67,11 +71,34 @@ function init() {
     }
   );
 
+  // WebXR Check
+  if (!navigator.xr) {
+    debug('navigator.xr NICHT verfügbar – keine WebXR-AR-Session möglich.');
+  } else {
+    debug('navigator.xr ist verfügbar.');
+  }
+
   // AR-Button MIT Hit-Test
   const arButton = ARButton.createButton(renderer, {
     requiredFeatures: ['hit-test']
   });
+
+  // Sicherstellen, dass der Button sichtbar ist
+  arButton.style.position = 'fixed';
+  arButton.style.bottom = '20px';
+  arButton.style.left = '50%';
+  arButton.style.transform = 'translateX(-50%)';
+  arButton.style.padding = '10px 20px';
+  arButton.style.borderRadius = '999px';
+  arButton.style.border = 'none';
+  arButton.style.fontSize = '14px';
+  arButton.style.fontWeight = '600';
+  arButton.style.zIndex = '20';
+  arButton.style.cursor = 'pointer';
+
+  debug('ARButton erstellt:', arButton);
   document.body.appendChild(arButton);
+  debug('ARButton ans DOM gehängt.');
 
   // Reticle
   const reticleGeo = new THREE.RingGeometry(0.06, 0.07, 32).rotateX(-Math.PI / 2);
@@ -83,6 +110,7 @@ function init() {
   reticle.matrixAutoUpdate = false;
   reticle.visible = false;
   scene.add(reticle);
+  debug('Reticle erstellt.');
 
   window.addEventListener('resize', onWindowResize);
 
@@ -135,12 +163,13 @@ function createStoneSpiral() {
     radius += radiusStep;
   }
 
-  // group.userData.rotate = true; // brauchen wir nicht mehr
   return group;
 }
 
 // Strudel einmalig auf Reticle setzen
 function placeSpiralAtReticle() {
+  if (!reticle) return;
+
   const m = reticle.matrix;
   const position = new THREE.Vector3();
   const quaternion = new THREE.Quaternion();
@@ -211,14 +240,7 @@ function render(timestamp, frame) {
     }
   }
 
-  // 🔥 KEINE Rotation mehr:
-  // if (stoneSpiral && stoneSpiral.userData.rotate) {
-  //   stoneSpiral.rotation.y += 0.4 * (1 / 60);
-  // }
-
-  renderer.render(scene, camera);
-}
-
+  // KEINE Rotation mehr
   renderer.render(scene, camera);
 }
 
