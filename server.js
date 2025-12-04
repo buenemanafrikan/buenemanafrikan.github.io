@@ -49,7 +49,7 @@ app.get('/api/stone-count', (req, res) => {
 // Wert um 1 erhöhen, neuen Wert zurückgeben
 app.post('/api/increment-stone-count', (req, res) => {
   let stoneCount = readStoneCount();
-  stoneCount += 1;
+  stoneCount += 5;
   writeStoneCount(stoneCount);
   console.log('stoneCount erhöht auf:', stoneCount);
   res.json({ stoneCount });
@@ -64,3 +64,4 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server läuft auf http://localhost:${PORT}`);
 });
+
