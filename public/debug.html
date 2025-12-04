@@ -54,10 +54,10 @@
 <body>
   <h1>StoneCount Debug</h1>
   <p>
-    Hier kannst du den globalen Zähler testen:
-    <code>/api/stone-count</code> (erhöhen),
-    <code>/api/decrement-press-count</code> (verringern),
-    <code>/api/reset-press-count</code> (auf 0 setzen).
+    - <code>GET /api/stone-count</code>: aktuellen Stand laden<br />
+    - <code>POST /api/stone-count</code>: globalen Zähler +1 (wie AR-Start)<br />
+    - <code>POST /api/decrement-press-count</code>: Zähler -1<br />
+    - <code>POST /api/reset-press-count</code>: Zähler auf 0 setzen
   </p>
 
   <div class="btn-row">
@@ -66,7 +66,7 @@
     <button id="btn-reset">Reset auf 0</button>
   </div>
 
-  <pre id="log">Noch nichts aufgerufen.</pre>
+  <pre id="log">Lade aktuellen Stand…</pre>
 
   <script>
     const btnInc = document.getElementById('btn-inc');
@@ -107,6 +107,36 @@
       }
     }
 
+    // Initial: aktuellen Stand holen (GET /api/stone-count)
+    async function loadCurrentStoneCount() {
+      setButtonsDisabled(true);
+      logEl.textContent = 'Lade aktuellen Stand (GET /api/stone-count)…';
+
+      try {
+        const res = await fetch('/api/stone-count', {
+          method: 'GET'
+        });
+        const text = await res.text();
+
+        let parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch (e) {
+          parsed = { raw: text };
+        }
+
+        logEl.textContent =
+          'Initialer GET /api/stone-count\n' +
+          'HTTP-Status: ' + res.status + '\n\n' +
+          'Antwort:\n' + JSON.stringify(parsed, null, 2);
+      } catch (err) {
+        logEl.textContent =
+          'Fehler beim GET /api/stone-count:\n' + String(err);
+      } finally {
+        setButtonsDisabled(false);
+      }
+    }
+
     // +1 wie AR-Start (POST /api/stone-count)
     btnInc.addEventListener('click', () => {
       callApi('/api/stone-count', 'POST');
@@ -121,8 +151,12 @@
     btnReset.addEventListener('click', () => {
       callApi('/api/reset-press-count', 'POST');
     });
+
+    // Beim Laden direkt aktuellen Stand holen
+    window.addEventListener('DOMContentLoaded', loadCurrentStoneCount);
   </script>
 </body>
 </html>
+
 
 
