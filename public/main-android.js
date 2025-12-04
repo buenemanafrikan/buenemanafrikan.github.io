@@ -138,11 +138,11 @@ function onWindowResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+// Spiral-Gruppe mit deinem Modell + Animations-Daten
 function createStoneSpiral() {
   const group = new THREE.Group();
 
-  // HIER wird der globale Wert benutzt
-  const stoneCount = stoneCountForSpiral;
+  const stoneCount = 60;
   const angleStepDeg = 15;
   const radiusStep = 0.03;
   const randomHeight = 0.01;
@@ -172,9 +172,11 @@ function createStoneSpiral() {
       stone = new THREE.Mesh(fallbackGeometry, fallbackMaterial);
     }
 
+    // Basis-Position setzen
     stone.position.set(x, y, z);
     stone.rotation.y = (Math.random() - 0.5) * Math.PI;
 
+    // Animations-Daten speichern
     stone.userData.baseAngle = angleRad;
     stone.userData.radius = radius;
     stone.userData.baseHeight = y;
@@ -186,15 +188,8 @@ function createStoneSpiral() {
     radius += radiusStep;
   }
 
+  // Stones im userData speichern, damit wir sie im render() animieren können
   group.userData.stones = stones;
-
-  // 🔍 Debug-Ausgabe:
-  console.log(
-    '[AR] createStoneSpiral(): stoneCountForSpiral =',
-    stoneCountForSpiral,
-    ' → erzeugte Steine =',
-    stones.length
-  );
 
   return group;
 }
