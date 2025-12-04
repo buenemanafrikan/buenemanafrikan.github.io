@@ -9,6 +9,8 @@
 //   KV_REST_API_URL
 //   KV_REST_API_TOKEN
 
+const numberOfStones = 200;
+
 export default async function handler(req, res) {
   const url = process.env.KV_REST_API_URL;
   const token = process.env.KV_REST_API_TOKEN;
@@ -46,7 +48,7 @@ export default async function handler(req, res) {
         throw new Error('Ungültige Antwort von Upstash: ' + bodyText);
       }
 
-      const baseStones = 100;    //Hier sind die tatsächlichen baseStones
+      const baseStones = numberOfStones;    //Hier sind die tatsächlichen baseStones
       const stoneCount = baseStones + pressCount;
 
       console.log('[API POST] pressCount =', pressCount, '→ stoneCount =', stoneCount);
@@ -77,7 +79,7 @@ export default async function handler(req, res) {
         if (parsed && parsed.result != null) {
           pressCount = Number(parsed.result);
         } else {
-          pressCount = 0;  //60
+          pressCount = numberOfStones;  //60
         }
       } catch (_e) {
         pressCount = Number(bodyText);
@@ -104,6 +106,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 }
+
 
 
 
