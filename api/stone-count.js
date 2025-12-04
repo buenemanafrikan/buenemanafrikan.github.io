@@ -79,7 +79,7 @@ export default async function handler(req, res) {
         if (parsed && parsed.result != null) {
           pressCount = Number(parsed.result);
         } else {
-          pressCount = numberOfStones;  //60
+          pressCount = 0;  //60
         }
       } catch (_e) {
         pressCount = Number(bodyText);
@@ -90,7 +90,7 @@ export default async function handler(req, res) {
         pressCount = 0;
       }
 
-      const baseStones = 50;  //60?
+      const baseStones = numberOfStones;  //60?
       const stoneCount = baseStones + pressCount;
 
       console.log('[API GET] pressCount =', pressCount, '→ stoneCount =', stoneCount);
@@ -106,6 +106,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 }
+
 
 
 
