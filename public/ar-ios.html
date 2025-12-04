@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stone Spiral AR – iOS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      font-family: system-ui, sans-serif;
+      overflow: hidden;
+    }
+    header {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.6);
+      padding: 6px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      z-index: 10;
+      text-align: center;
+    }
+    model-viewer {
+      width: 100vw;
+      height: 100vh;
+      outline: none;
+    }
+  </style>
+
+  <!-- model-viewer Web Component -->
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+</head>
+<body>
+  <header>
+    Tippe unten auf „In AR ansehen“, um den Steine-Strudel im Raum zu platzieren.
+  </header>
+
+  <model-viewer
+    src="./assets/models/StoneStrudel.glb"
+    ios-src="./assets/models/StoneStrudel.usdz"
+    ar
+    ar-modes="quick-look scene-viewer webxr"
+    camera-controls
+    auto-rotate
+    autoplay
+    environment-image="neutral"
+  >
+  </model-viewer>
+</body>
+</html>

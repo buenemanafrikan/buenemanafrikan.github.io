@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stone Spiral AR – Einstieg</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="message">
+    <p>Prüfe Gerät…</p>
+    <p>Falls nichts passiert, bitte diese Seite mit einem Smartphone (Android oder iPhone) öffnen.</p>
+  </div>
+
+  <script>
+    (function () {
+      const ua = navigator.userAgent || navigator.vendor || window.opera;
+
+      const isIOS =
+        /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+      const isAndroid = /Android/i.test(ua);
+
+      if (isIOS) {
+        window.location.replace('ar-ios.html');
+      } else if (isAndroid) {
+        window.location.replace('ar-android.html');
+      } else {
+        // Desktop oder etwas anderes → einfach Info stehen lassen
+        document.getElementById('message').innerHTML =
+          '<p>Bitte mit einem Smartphone (Android oder iPhone) öffnen.</p>';
+      }
+    })();
+  </script>
+</body>
+</html>

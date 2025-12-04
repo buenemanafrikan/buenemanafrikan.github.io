@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stone Spiral AR – Android</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: system-ui, sans-serif;
+      background: #000;
+      color: #fff;
+    }
+    canvas {
+      display: block;
+    }
+    .info {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.5);
+      padding: 6px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div class="info">
+    Tippe auf <b>Start AR</b> und richte dein Handy leicht nach vorne. Der Steine-Strudel erscheint vor dir.<br />
+    Du kannst antippen, um ihn neu zu platzieren.
+  </div>
+
+  <script type="module" src="./main-android.js"></script>
+</body>
+</html>
