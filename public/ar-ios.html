@@ -4,14 +4,20 @@
   <meta charset="UTF-8" />
   <title>Stone Spiral AR – iOS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       background: #000;
       color: #fff;
-      font-family: system-ui, sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
       overflow: hidden;
     }
+
     header {
       position: fixed;
       top: 10px;
@@ -23,16 +29,33 @@
       font-size: 12px;
       z-index: 10;
       text-align: center;
+      max-width: 90vw;
     }
+
     model-viewer {
       width: 100vw;
       height: 100vh;
       outline: none;
     }
+
+    /* eigener AR-Button */
+    .ar-btn {
+      background: #ffffff;
+      color: #000000;
+      border: none;
+      border-radius: 999px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
   </style>
 
   <!-- model-viewer Web Component -->
-  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+  <script
+    type="module"
+    src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
+  </script>
 </head>
 <body>
   <header>
@@ -40,8 +63,10 @@
   </header>
 
   <model-viewer
+    id="stone-strudel-viewer"
     src="./assets/models/StoneStrudel.glb"
     ios-src="./assets/models/StoneStrudel.usdz"
+    alt="Steine-Strudel als 3D-Modell"
     ar
     ar-modes="quick-look scene-viewer webxr"
     camera-controls
@@ -49,6 +74,65 @@
     autoplay
     environment-image="neutral"
   >
+    <!-- eigener AR-Button -->
+    <button slot="ar-button" class="ar-btn">
+      In AR ansehen
+    </button>
   </model-viewer>
+
+  <script>
+    // >>> HIER ggf. anpassen: gleiche URL wie in main-android.js <<<
+    const STONE_COUNT_ENDPOINT = '/api/increment-stone-count';
+    // z.B. '/api/stone-count' wenn du Kebab-Case nutzt
+
+    const viewer = document.getElementById('stone-strudel-viewer');
+
+    let stoneCountAlreadyIncremented = false;
+
+    function incrementStoneCountOnce() {
+      if (stoneCountAlreadyIncremented) return;
+      stoneCountAlreadyIncremented = true;
+
+      fetch(STONE_COUNT_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason: 'ios-ar-start' })
+      })
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error('HTTP ' + res.status);
+          }
+          return res.json().catch(() => null);
+        })
+        .then((data) => {
+          console.log('[iOS] stoneCount increment result:', data);
+        })
+        .catch((err) => {
+          console.error('[iOS] stoneCount increment failed:', err);
+        });
+    }
+
+    if (viewer) {
+      // WebXR / Scene Viewer etc.
+      viewer.addEventListener('ar-status', (event) => {
+        const status = event.detail && event.detail.status;
+        console.log('[iOS model-viewer] ar-status:', status);
+
+        // Wenn AR-Session wirklich gestartet ist → einmal erhöhen
+        if (status === 'session-started') {
+          incrementStoneCountOnce();
+        }
+      });
+
+      // iOS Quick Look (typischer Fall auf iPhone)
+      viewer.addEventListener('quick-look-button-tapped', () => {
+        console.log('[iOS model-viewer] Quick Look gestartet');
+        incrementStoneCountOnce();
+      });
+    }
+  </script>
 </body>
 </html>
+
