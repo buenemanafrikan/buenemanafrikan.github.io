@@ -54,7 +54,7 @@ export default async function handler(req, res) {
 
     // 2) Dein eigentlicher Stein-Count:
     // Basis 60 + Anzahl Aufrufe
-    const baseStones = 60;
+    const baseStones = 260;
     const stoneCount = baseStones + pressCount; // 1. Aufruf = 61, 2. = 62, ...
 
     console.log('[API] pressCount =', pressCount, '→ stoneCount =', stoneCount);
@@ -65,4 +65,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'KV error' });
   }
 }
+
 
