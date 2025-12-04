@@ -48,7 +48,7 @@ export default async function handler(req, res) {
         throw new Error('Ungültige Antwort von Upstash: ' + bodyText);
       }
 
-      const baseStones = numberOfStones;    //Hier sind die tatsächlichen baseStones
+      const baseStones = 30;    //Hier sind die tatsächlichen baseStones  //numberOfStones
       const stoneCount = baseStones + pressCount;
 
       console.log('[API POST] pressCount =', pressCount, '→ stoneCount =', stoneCount);
@@ -90,7 +90,7 @@ export default async function handler(req, res) {
         pressCount = 0;
       }
 
-      const baseStones = numberOfStones;  //60?
+      const baseStones = 30;  //60?  //numberOfStones
       const stoneCount = baseStones + pressCount;
 
       console.log('[API GET] pressCount =', pressCount, '→ stoneCount =', stoneCount);
@@ -106,6 +106,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 }
+
 
 
 
