@@ -1,4 +1,4 @@
-// main-android.js
+// public/main-android.js
 import * as THREE from './libs/three.module.js';
 import { ARButton } from './libs/ARButton.js';
 import { GLTFLoader } from './libs/GLTFLoader.js';
@@ -11,23 +11,26 @@ let stoneModel = null;
 const tmpPos = new THREE.Vector3();
 const tmpDir = new THREE.Vector3();
 
-let initialPlaced = false;           // ob der Strudel schon einmal automatisch gesetzt wurde
-let stoneCountIncremented = false;   // ob wir für diese Seite schon ++ gemacht haben
+let initialPlaced = false; // ob der Strudel schon einmal automatisch gesetzt wurde
 
-const STONE_COUNT_ENDPOINT = '/api/increment-stone-count';
+// Wert aus der DB (gesamt-Zähler), Basis 60 als Start
+let stoneCountForSpiral = 60;
 
 function debug(msg) {
   console.log('[AR]', msg);
 }
 
-// ---- GLOBALER COUNTER: API-CALL (nur einmal pro Session) ----
-async function incrementStoneCountOnce() {
-  if (stoneCountIncremented) return; // Schutz: nur einmal pro Seitenaufruf
-  stoneCountIncremented = true;
-
+// ---- GLOBALER COUNTER: API-CALL zu Vercel-Funktion ----
+// Wird bei AR-Sessionstart aufgerufen: erhöht globalen Zähler
+// und lädt den neuen Wert in stoneCountForSpiral.
+async function incrementStoneCountAndLoad() {
   try {
-    const res = await fetch(STONE_COUNT_ENDPOINT, {
-      method: 'POST'
+    const res = await fetch('/api/stone-count', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ reason: 'android-ar-start' })
     });
 
     if (!res.ok) {
@@ -36,12 +39,18 @@ async function incrementStoneCountOnce() {
     }
 
     const data = await res.json();
-    console.log('[AR] stoneCount ist jetzt:', data.stoneCount);
+
+    if (typeof data.stoneCount === 'number') {
+      stoneCountForSpiral = data.stoneCount;
+      console.log('[AR] DB stoneCount ist jetzt:', stoneCountForSpiral);
+    } else {
+      console.warn('[AR] API-Antwort ohne stoneCount, verwende bisherigen Wert:', stoneCountForSpiral);
+    }
   } catch (err) {
-    console.error('Request /api/increment-stone-count fehlgeschlagen:', err);
+    console.error('Request /api/stone-count fehlgeschlagen:', err);
   }
 }
-// -------------------------------------------------------------
+// -------------------------------------------------------
 
 init();
 animate();
@@ -115,10 +124,10 @@ function init() {
   document.body.appendChild(arButton);
   debug('ARButton erstellt.');
 
-  // 👉 Wenn AR-Session startet (also nach Klick auf Start AR) → globaler Counter++
+  // 👉 Wenn AR-Session startet → globaler Counter++ (KV) & Wert laden
   renderer.xr.addEventListener('sessionstart', () => {
-    debug('AR-Session gestartet → stoneCount++');
-    incrementStoneCountOnce();
+    debug('AR-Session gestartet → globaler stoneCount++ (KV)');
+    incrementStoneCountAndLoad(); // läuft im Hintergrund, blockiert nix
   });
 
   // XR-Controller für Taps (select-Event im AR-Modus)
@@ -142,7 +151,24 @@ function onWindowResize() {
 function createStoneSpiral() {
   const group = new THREE.Group();
 
-  const stoneCount = 60;
+  // 🔥 Mapping: aus globalem DB-Wert eine deutlich sichtbare Steinanzahl machen
+  // Annahme: DB stoneCount startet bei 60
+  const baseStones = 40;              // Grund-Strudel
+  const extraPerVisit = 3;            // pro globalem Zähler 3 Steine mehr
+  const visits = Math.max(0, stoneCountForSpiral - 60);
+  const maxStones = 400;
+
+  const stoneCount = Math.min(baseStones + visits * extraPerVisit, maxStones);
+
+  console.log(
+    '[AR] createStoneSpiral(): DB stoneCount =',
+    stoneCountForSpiral,
+    '→ visits =',
+    visits,
+    '→ final stoneCount =',
+    stoneCount
+  );
+
   const angleStepDeg = 15;
   const radiusStep = 0.03;
   const randomHeight = 0.01;
@@ -200,7 +226,7 @@ function ensureStoneSpiral() {
     stoneSpiral = createStoneSpiral();
     stoneSpiral.scale.set(0.3, 0.3, 0.3); // Größe des Strudels
     scene.add(stoneSpiral);
-    debug('Strudel erzeugt.');
+    debug('Strudel erzeugt (stoneCountForSpiral=' + stoneCountForSpiral + ').');
   }
 }
 
@@ -277,4 +303,5 @@ function render(timestamp /*, frame*/) {
 
   renderer.render(scene, camera);
 }
+
 
