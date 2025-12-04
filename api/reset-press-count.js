@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     }
 
     const pressCount = 0;
-    const baseStones = numberOfStones;  // vorher 60 // dann 1
+    const baseStones = 30;  // vorher 60 // dann 1
     const stoneCount = baseStones + pressCount;
 
     console.log('[API reset] pressCount =', pressCount, '→ stoneCount =', stoneCount);
@@ -42,6 +42,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'KV error' });
   }
 }
+
 
 
 
