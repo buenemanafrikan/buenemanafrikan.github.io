@@ -46,7 +46,7 @@ export default async function handler(req, res) {
         throw new Error('Ungültige Antwort von Upstash: ' + bodyText);
       }
 
-      const baseStones = 1;
+      const baseStones = 100;
       const stoneCount = baseStones + pressCount;
 
       console.log('[API POST] pressCount =', pressCount, '→ stoneCount =', stoneCount);
@@ -104,6 +104,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 }
+
 
 
 
