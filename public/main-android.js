@@ -15,7 +15,7 @@ const tmpDir = new THREE.Vector3();
 let initialPlaced = false;
 
 // Wert aus der DB (gesamt-Zähler), Basis 60 als Start
-let stoneCountForSpiral = 60;
+let stoneCountForSpiral = 0;
 // wurde der Wert aus der API schon geladen (oder Request abgeschlossen)?
 let stoneCountLoaded = false;
 
@@ -305,3 +305,4 @@ function render(timestamp /*, frame*/) {
 
   renderer.render(scene, camera);
 }
+
