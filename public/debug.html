@@ -21,6 +21,12 @@
       margin-top: 0;
       margin-bottom: 16px;
     }
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
     button {
       padding: 10px 16px;
       border-radius: 999px;
@@ -30,7 +36,6 @@
       font-weight: 600;
       font-size: 14px;
       cursor: pointer;
-      margin-bottom: 16px;
     }
     button:disabled {
       opacity: 0.6;
@@ -49,30 +54,41 @@
 <body>
   <h1>StoneCount Debug</h1>
   <p>
-    Dieser Button macht <code>POST /api/stone-count</code> – also genau das,
-    was auch beim Start von AR passiert. Der globale Zähler wird dabei um 1 erhöht.
+    Hier kannst du den globalen Zähler testen:
+    <code>/api/stone-count</code> (erhöhen),
+    <code>/api/decrement-press-count</code> (verringern),
+    <code>/api/reset-press-count</code> (auf 0 setzen).
   </p>
 
-  <button id="btn">AR-Start simulieren (POST /api/stone-count)</button>
+  <div class="btn-row">
+    <button id="btn-inc">+1 (AR-Start simulieren)</button>
+    <button id="btn-dec">-1 (Zähler verringern)</button>
+    <button id="btn-reset">Reset auf 0</button>
+  </div>
 
   <pre id="log">Noch nichts aufgerufen.</pre>
 
   <script>
-    const btn = document.getElementById('btn');
+    const btnInc = document.getElementById('btn-inc');
+    const btnDec = document.getElementById('btn-dec');
+    const btnReset = document.getElementById('btn-reset');
     const logEl = document.getElementById('log');
 
-    async function simulateArStart() {
-      btn.disabled = true;
-      logEl.textContent = 'Sende Request…';
+    function setButtonsDisabled(disabled) {
+      btnInc.disabled = disabled;
+      btnDec.disabled = disabled;
+      btnReset.disabled = disabled;
+    }
+
+    async function callApi(path, method = 'POST') {
+      setButtonsDisabled(true);
+      logEl.textContent = `Sende Request: ${method} ${path} …`;
 
       try {
-        const res = await fetch('/api/stone-count', {
-          method: 'POST'
-        });
-
+        const res = await fetch(path, { method });
         const text = await res.text();
-        let parsed;
 
+        let parsed;
         try {
           parsed = JSON.parse(text);
         } catch (e) {
@@ -80,16 +96,33 @@
         }
 
         logEl.textContent =
-          'HTTP-Status: ' + res.status + '\n\nAntwort:\n' +
-          JSON.stringify(parsed, null, 2);
+          'Request: ' + method + ' ' + path + '\n' +
+          'HTTP-Status: ' + res.status + '\n\n' +
+          'Antwort:\n' + JSON.stringify(parsed, null, 2);
       } catch (err) {
-        logEl.textContent = 'Fehler beim Request:\n' + String(err);
+        logEl.textContent =
+          'Request-Fehler bei ' + method + ' ' + path + ':\n' + String(err);
       } finally {
-        btn.disabled = false;
+        setButtonsDisabled(false);
       }
     }
 
-    btn.addEventListener('click', simulateArStart);
+    // +1 wie AR-Start (POST /api/stone-count)
+    btnInc.addEventListener('click', () => {
+      callApi('/api/stone-count', 'POST');
+    });
+
+    // -1 (POST /api/decrement-press-count)
+    btnDec.addEventListener('click', () => {
+      callApi('/api/decrement-press-count', 'POST');
+    });
+
+    // Reset auf 0 (POST /api/reset-press-count)
+    btnReset.addEventListener('click', () => {
+      callApi('/api/reset-press-count', 'POST');
+    });
   </script>
 </body>
 </html>
+
+
