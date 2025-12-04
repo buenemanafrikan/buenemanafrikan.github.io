@@ -11,10 +11,13 @@ let stoneModel = null;
 const tmpPos = new THREE.Vector3();
 const tmpDir = new THREE.Vector3();
 
-let initialPlaced = false; // ob der Strudel schon einmal automatisch gesetzt wurde
+// Flag: wurde der Strudel schon einmal automatisch gesetzt?
+let initialPlaced = false;
 
 // Wert aus der DB (gesamt-Zähler), Basis 60 als Start
 let stoneCountForSpiral = 60;
+// wurde der Wert aus der API schon geladen (oder Request abgeschlossen)?
+let stoneCountLoaded = false;
 
 function debug(msg) {
   console.log('[AR]', msg);
@@ -44,10 +47,16 @@ async function incrementStoneCountAndLoad() {
       stoneCountForSpiral = data.stoneCount;
       console.log('[AR] DB stoneCount ist jetzt:', stoneCountForSpiral);
     } else {
-      console.warn('[AR] API-Antwort ohne stoneCount, verwende bisherigen Wert:', stoneCountForSpiral);
+      console.warn(
+        '[AR] API-Antwort ohne stoneCount, verwende bisherigen Wert:',
+        stoneCountForSpiral
+      );
     }
   } catch (err) {
     console.error('Request /api/stone-count fehlgeschlagen:', err);
+  } finally {
+    // Egal ob erfolgreich oder Fehler → wir blockieren das Rendering nicht ewig
+    stoneCountLoaded = true;
   }
 }
 // -------------------------------------------------------
@@ -124,10 +133,11 @@ function init() {
   document.body.appendChild(arButton);
   debug('ARButton erstellt.');
 
-  // 👉 Wenn AR-Session startet → globaler Counter++ (KV) & Wert laden
+  // Wenn AR-Session startet → globaler Counter++ (KV) & Wert laden
   renderer.xr.addEventListener('sessionstart', () => {
     debug('AR-Session gestartet → globaler stoneCount++ (KV)');
-    incrementStoneCountAndLoad(); // läuft im Hintergrund, blockiert nix
+    stoneCountLoaded = false; // Immer neu laden, wenn eine Session startet
+    incrementStoneCountAndLoad();
   });
 
   // XR-Controller für Taps (select-Event im AR-Modus)
@@ -151,23 +161,9 @@ function onWindowResize() {
 function createStoneSpiral() {
   const group = new THREE.Group();
 
-  // 🔥 Mapping: aus globalem DB-Wert eine deutlich sichtbare Steinanzahl machen
-  // Annahme: DB stoneCount startet bei 60
-  const baseStones = 40;              // Grund-Strudel
-  const extraPerVisit = 3;            // pro globalem Zähler 3 Steine mehr
-  const visits = Math.max(0, stoneCountForSpiral - 60);
-  const maxStones = 400;
-
-  const stoneCount = Math.min(baseStones + visits * extraPerVisit, maxStones);
-
-  console.log(
-    '[AR] createStoneSpiral(): DB stoneCount =',
-    stoneCountForSpiral,
-    '→ visits =',
-    visits,
-    '→ final stoneCount =',
-    stoneCount
-  );
+  // 👇 Anzahl Steine = stoneCount aus der API (1:1)
+  const stoneCount = Math.max(1, Math.min(stoneCountForSpiral, 500)); // min 1, max 500
+  console.log('[AR] createStoneSpiral(): stoneCountForSpiral =', stoneCountForSpiral, '→ Steine im Strudel =', stoneCount);
 
   const angleStepDeg = 15;
   const radiusStep = 0.03;
@@ -226,7 +222,13 @@ function ensureStoneSpiral() {
     stoneSpiral = createStoneSpiral();
     stoneSpiral.scale.set(0.3, 0.3, 0.3); // Größe des Strudels
     scene.add(stoneSpiral);
-    debug('Strudel erzeugt (stoneCountForSpiral=' + stoneCountForSpiral + ').');
+    debug(
+      'Strudel erzeugt (stoneCountForSpiral=' +
+        stoneCountForSpiral +
+        ', Steine=' +
+        stoneSpiral.userData.stones.length +
+        ').'
+    );
   }
 }
 
@@ -269,8 +271,8 @@ function animate() {
 function render(timestamp /*, frame*/) {
   const session = renderer.xr.getSession();
 
-  // Wenn AR läuft und Modell geladen, aber Strudel noch nie gesetzt → einmal automatisch vor Kamera platzieren
-  if (session && stoneModel && !initialPlaced) {
+  // Wenn AR läuft, Modell geladen, stoneCount geladen, und Strudel noch nie gesetzt
+  if (session && stoneModel && stoneCountLoaded && !initialPlaced) {
     ensureStoneSpiral();
     placeSpiralInFrontOfCamera(1.2);
     initialPlaced = true;
@@ -303,5 +305,3 @@ function render(timestamp /*, frame*/) {
 
   renderer.render(scene, camera);
 }
-
-
