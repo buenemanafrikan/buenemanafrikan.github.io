@@ -1,65 +1,68 @@
 // api/stone-count.js
+//
+// Diese Funktion läuft auf Vercel als Serverless Function.
+// Sie benutzt Upstash KV über die REST-API.
+//
+// Erwartete ENV-Variablen:
+//   KV_REST_API_URL
+//   KV_REST_API_TOKEN
+//
+// Verhalten:
+//   - Erhöht einen globalen Zähler "pressCount" um 1
+//   - Rechnet daraus stoneCount = 60 + pressCount
+//   - Antwort: { stoneCount: <number> }
 
 export default async function handler(req, res) {
-  // immer JSON schicken
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { KV_REST_API_URL, KV_REST_API_TOKEN } = process.env;
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
 
-  if (!KV_REST_API_URL || !KV_REST_API_TOKEN) {
-    console.error('[stone-count] KV env vars fehlen');
-    return res.status(500).json({
-      error: 'Server misconfigured: KV_REST_API_URL oder KV_REST_API_TOKEN fehlt'
-    });
+  if (!url || !token) {
+    console.error('KV_REST_API_URL oder KV_REST_API_TOKEN fehlt');
+    return res.status(500).json({ error: 'KV config missing' });
   }
 
   try {
-    // Upstash KV: key "stoneCount" um 1 erhöhen
-    const url = `${KV_REST_API_URL}/incr/stoneCount`;
-
-    const upstashRes = await fetch(url, {
+    // 1) Globalen Aufrufzähler erhöhen
+    // Key-Name "pressCount" ist komplett egal, Hauptsache überall gleich
+    const incrRes = await fetch(`${url}/incr/pressCount`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${KV_REST_API_TOKEN}`
-      }
+        Authorization: `Bearer ${token}`,
+      },
     });
 
-    const text = await upstashRes.text();
-    let data = null;
+    const bodyText = await incrRes.text();
+    let pressCount;
 
     try {
-      data = JSON.parse(text);
+      // Upstash-KV gibt normalerweise { "result": <number> } zurück
+      const parsed = JSON.parse(bodyText);
+      pressCount = parsed.result;
     } catch (e) {
-      console.error('[stone-count] Upstash hat kein JSON zurückgegeben:', text);
-      return res.status(500).json({
-        error: 'Upstash returned non-JSON response',
-        raw: text
-      });
+      // Falls aus irgendeinem Grund nur "42" zurückkommt
+      pressCount = Number(bodyText);
     }
 
-    if (!upstashRes.ok) {
-      console.error('[stone-count] Upstash-Fehler:', data);
-      return res.status(500).json({
-        error: 'Upstash error',
-        details: data
-      });
+    if (!Number.isFinite(pressCount)) {
+      throw new Error('Ungültige Antwort von Upstash: ' + bodyText);
     }
 
-    const result = data.result;
-    const stoneCount =
-      typeof result === 'number' ? result : Number(result) || 0;
+    // 2) Dein eigentlicher Stein-Count:
+    // Basis 60 + Anzahl Aufrufe
+    const baseStones = 60;
+    const stoneCount = baseStones + pressCount; // 1. Aufruf = 61, 2. = 62, ...
 
-    console.log('[stone-count] Neuer stoneCount:', stoneCount);
+    console.log('[API] pressCount =', pressCount, '→ stoneCount =', stoneCount);
 
     return res.status(200).json({ stoneCount });
   } catch (err) {
-    console.error('[stone-count] Unerwarteter Serverfehler:', err);
-    return res.status(500).json({
-      error: 'Internal server error'
-    });
+    console.error('[API] Fehler bei Upstash:', err);
+    return res.status(500).json({ error: 'KV error' });
   }
 }
+
