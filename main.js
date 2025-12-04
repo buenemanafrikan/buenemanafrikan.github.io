@@ -52,7 +52,7 @@ function init() {
   // Modell laden
   const loader = new GLTFLoader();
   loader.load(
-    './assets/models/Planet3.glb',
+    './assets/models/Stone.glb',
     (gltf) => {
       stoneModel = gltf.scene;
 
@@ -244,6 +244,7 @@ function render(timestamp, frame) {
 
   renderer.render(scene, camera);
 }
+
 
 
 
