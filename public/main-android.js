@@ -1,3 +1,4 @@
+// main-android.js
 import * as THREE from './libs/three.module.js';
 import { ARButton } from './libs/ARButton.js';
 import { GLTFLoader } from './libs/GLTFLoader.js';
@@ -10,11 +11,37 @@ let stoneModel = null;
 const tmpPos = new THREE.Vector3();
 const tmpDir = new THREE.Vector3();
 
-let initialPlaced = false; // ob der Strudel schon einmal automatisch gesetzt wurde
+let initialPlaced = false;           // ob der Strudel schon einmal automatisch gesetzt wurde
+let stoneCountIncremented = false;   // ob wir für diese Seite schon ++ gemacht haben
+
+const STONE_COUNT_ENDPOINT = '/api/increment-stone-count';
 
 function debug(msg) {
   console.log('[AR]', msg);
 }
+
+// ---- GLOBALER COUNTER: API-CALL (nur einmal pro Session) ----
+async function incrementStoneCountOnce() {
+  if (stoneCountIncremented) return; // Schutz: nur einmal pro Seitenaufruf
+  stoneCountIncremented = true;
+
+  try {
+    const res = await fetch(STONE_COUNT_ENDPOINT, {
+      method: 'POST'
+    });
+
+    if (!res.ok) {
+      console.error('Fehler beim Erhöhen von stoneCount:', res.status);
+      return;
+    }
+
+    const data = await res.json();
+    console.log('[AR] stoneCount ist jetzt:', data.stoneCount);
+  } catch (err) {
+    console.error('Request /api/increment-stone-count fehlgeschlagen:', err);
+  }
+}
+// -------------------------------------------------------------
 
 init();
 animate();
@@ -49,10 +76,10 @@ function init() {
   scene.add(dirLight);
   debug('Licht gesetzt.');
 
-  // Modell laden (ein Stein)
+  // Modell laden
   const loader = new GLTFLoader();
   loader.load(
-    './assets/models/Stone.glb', // dein Stein-Modell
+    './assets/models/Stone.glb',
     (gltf) => {
       stoneModel = gltf.scene;
 
@@ -72,7 +99,7 @@ function init() {
     }
   );
 
-  // AR-Button OHNE hit-test (WebXR übernimmt Tracking)
+  // AR-Button OHNE hit-test
   const arButton = ARButton.createButton(renderer);
   arButton.style.position = 'fixed';
   arButton.style.bottom = '20px';
@@ -87,6 +114,12 @@ function init() {
   arButton.style.cursor = 'pointer';
   document.body.appendChild(arButton);
   debug('ARButton erstellt.');
+
+  // 👉 Wenn AR-Session startet (also nach Klick auf Start AR) → globaler Counter++
+  renderer.xr.addEventListener('sessionstart', () => {
+    debug('AR-Session gestartet → stoneCount++');
+    incrementStoneCountOnce();
+  });
 
   // XR-Controller für Taps (select-Event im AR-Modus)
   const controller = renderer.xr.getController(0);
@@ -207,7 +240,7 @@ function animate() {
   renderer.setAnimationLoop(render);
 }
 
-function render(timestamp /*, frame */) {
+function render(timestamp /*, frame*/) {
   const session = renderer.xr.getSession();
 
   // Wenn AR läuft und Modell geladen, aber Strudel noch nie gesetzt → einmal automatisch vor Kamera platzieren
