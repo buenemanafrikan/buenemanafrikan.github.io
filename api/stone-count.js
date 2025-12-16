@@ -1,9 +1,9 @@
 // api/stone-count.js
 //
 // POST  → globalen Aufrufzähler "pressCount" in Upstash-KV erhöhen (+1)
-//        und daraus stoneCount = 60 + pressCount berechnen.
+//        und daraus stoneCount = 30 + pressCount berechnen.
 // GET   → aktuellen pressCount lesen (ohne zu erhöhen) und ebenfalls
-//        stoneCount = 60 + pressCount zurückgeben.
+//        stoneCount = 30 + pressCount zurückgeben.
 //
 // ENV-Variablen:
 //   KV_REST_API_URL
@@ -12,6 +12,17 @@
 const numberOfStones = 200;
 
 export default async function handler(req, res) {
+  // --- CORS, damit 8th Wall (andere Domain) zugreifen darf ---
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    // Preflight-Request vom Browser
+    return res.status(200).end();
+  }
+  // ------------------------------------------------------------
+
   const url = process.env.KV_REST_API_URL;
   const token = process.env.KV_REST_API_TOKEN;
 
@@ -28,8 +39,8 @@ export default async function handler(req, res) {
       const incrRes = await fetch(`${url}/incr/pressCount`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       const bodyText = await incrRes.text();
@@ -48,7 +59,7 @@ export default async function handler(req, res) {
         throw new Error('Ungültige Antwort von Upstash: ' + bodyText);
       }
 
-      const baseStones = 30;    //Hier sind die tatsächlichen baseStones  //numberOfStones
+      const baseStones = 30; // deine aktuellen Basis-Steine
       const stoneCount = baseStones + pressCount;
 
       console.log('[API POST] pressCount =', pressCount, '→ stoneCount =', stoneCount);
@@ -66,8 +77,8 @@ export default async function handler(req, res) {
       const getRes = await fetch(`${url}/get/pressCount`, {
         method: 'GET',
         headers: {
-          Authorization: `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       const bodyText = await getRes.text();
@@ -79,7 +90,7 @@ export default async function handler(req, res) {
         if (parsed && parsed.result != null) {
           pressCount = Number(parsed.result);
         } else {
-          pressCount = 0;  //60
+          pressCount = 0;
         }
       } catch (_e) {
         pressCount = Number(bodyText);
@@ -90,7 +101,7 @@ export default async function handler(req, res) {
         pressCount = 0;
       }
 
-      const baseStones = 30;  //60?  //numberOfStones
+      const baseStones = 30;
       const stoneCount = baseStones + pressCount;
 
       console.log('[API GET] pressCount =', pressCount, '→ stoneCount =', stoneCount);
@@ -102,11 +113,10 @@ export default async function handler(req, res) {
     }
   } else {
     // nur GET und POST erlauben
-    res.setHeader('Allow', ['GET', 'POST']);
+    res.setHeader('Allow', ['GET', 'POST', 'OPTIONS']);
     return res.status(405).json({ error: 'Method not allowed' });
   }
 }
-
 
 
 
