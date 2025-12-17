@@ -2,13 +2,15 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <title>AR.js – Hiro Test</title>
+    <title>Stone Spiral AR – iOS (Marker)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
     <style>
       body {
         margin: 0;
         overflow: hidden;
       }
+
       #status {
         position: fixed;
         top: 10px;
@@ -24,7 +26,7 @@
       }
     </style>
 
-    <!-- A-Frame + AR.js -->
+    <!-- A-Frame + AR.js (Marker) -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
   </head>
@@ -43,32 +45,182 @@
         preset="hiro"
         emitevents="true"
       >
-        <!-- Einfacher gelber Würfel, damit man sofort was sieht -->
-        <a-box
-          position="0 0.5 0"
-          material="color: yellow;"
-        ></a-box>
+        <!-- Hier hängen wir später per JS den Strudel dran -->
+        <a-entity id="spiral-root" stone-spiral></a-entity>
       </a-marker>
 
       <a-entity camera></a-entity>
     </a-scene>
 
     <script>
-      const marker = document.getElementById('hiroMarker');
-      const statusEl = document.getElementById('status');
+      // A-Frame Komponente für Steine-Strudel
+      AFRAME.registerComponent('stone-spiral', {
+        schema: {},
 
-      marker.addEventListener('markerFound', () => {
-        console.log('[AR.js] markerFound');
-        statusEl.textContent = 'Marker ERKANNT ✅';
-      });
+        init: function () {
+          const self = this;
+          const THREE = AFRAME.THREE;
+          const statusEl = document.getElementById('status');
+          const markerEl = document.getElementById('hiroMarker');
 
-      marker.addEventListener('markerLost', () => {
-        console.log('[AR.js] markerLost');
-        statusEl.textContent = 'Marker verloren…';
+          // Zustand
+          this.stones = [];
+          this.spiralGroup = null;
+          this.apiRequested = false; // schon einmal API-Call gestartet?
+
+          // ---- API: globaler stoneCount via /api/stone-count ----
+          async function fetchStoneCountAndCreateSpiral() {
+            const endpoint = '/api/stone-count'; // gleiche Route wie Android
+
+            try {
+              statusEl.textContent = 'Hole stoneCount vom Server…';
+
+              const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ reason: 'ios-marker-found' })
+              });
+
+              if (!res.ok) {
+                console.error('[iOS AR] /api/stone-count HTTP-Fehler:', res.status);
+                statusEl.textContent =
+                  'Fehler bei stoneCount-API (Status ' + res.status + '). Nutze Default.';
+                // Default: z.B. 60 Steine
+                createSpiral(60);
+                return;
+              }
+
+              const data = await res.json();
+              let stoneCount = 60;
+
+              if (typeof data.stoneCount === 'number') {
+                stoneCount = data.stoneCount;
+              }
+
+              // Clamp wie bei Android
+              stoneCount = Math.max(1, Math.min(stoneCount, 500));
+
+              console.log('[iOS AR] stoneCount vom Server:', stoneCount);
+              statusEl.textContent =
+                'Marker erkannt – Steine: ' + stoneCount + ' (globaler Counter)';
+
+              createSpiral(stoneCount);
+            } catch (err) {
+              console.error('[iOS AR] stoneCount-Request fehlgeschlagen:', err);
+              statusEl.textContent =
+                'stoneCount-Request fehlgeschlagen. Nutze Default.';
+              createSpiral(60);
+            }
+          }
+
+          // ---- Strudel erzeugen (Box-Steine) ----
+          function createSpiral(stoneCount) {
+            if (self.spiralGroup) return; // schon gebaut
+
+            const group = new THREE.Group();
+            const stones = [];
+
+            const angleStepDeg = 15;
+            const radiusStep = 0.03;
+            const randomHeight = 0.01;
+
+            const geom = new THREE.BoxGeometry(0.04, 0.025, 0.06);
+            const mat = new THREE.MeshStandardMaterial({
+              color: 0x777777,
+              roughness: 0.9,
+              metalness: 0.1
+            });
+
+            let angleRad = 0;
+            let radius = 0;
+            const angleStepRad = (angleStepDeg * Math.PI) / 180;
+
+            for (let i = 0; i < stoneCount; i++) {
+              const x = Math.cos(angleRad) * radius;
+              const z = Math.sin(angleRad) * radius;
+              const y = (Math.random() - 0.5) * 2 * randomHeight;
+
+              const stone = new THREE.Mesh(geom, mat);
+
+              // Basis-Position setzen
+              stone.position.set(x, y, z);
+              stone.rotation.y = (Math.random() - 0.5) * Math.PI;
+
+              // Animations-Daten speichern
+              stone.userData.baseAngle = angleRad;
+              stone.userData.radius = radius;
+              stone.userData.baseHeight = y;
+
+              group.add(stone);
+              stones.push(stone);
+
+              angleRad += angleStepRad;
+              radius += radiusStep;
+            }
+
+            // Strudel etwas skalieren, damit er gut über dem Marker hängt
+            group.scale.set(0.4, 0.4, 0.4);
+            group.position.set(0, 0, 0); // direkt auf Marker-Zentrum
+
+            // An den Marker hängen
+            const markerObj = markerEl.object3D;
+            markerObj.add(group);
+
+            self.spiralGroup = group;
+            self.stones = stones;
+
+            console.log('[iOS AR] Strudel erzeugt mit', stoneCount, 'Steinen.');
+          }
+
+          // Wenn Marker das erste Mal erkannt wird → API + Strudel
+          markerEl.addEventListener('markerFound', () => {
+            console.log('[iOS AR] markerFound');
+            statusEl.textContent = 'Marker erkannt – Strudel wird erzeugt…';
+
+            if (!self.apiRequested) {
+              self.apiRequested = true; // nur einmal pro Seitenaufruf
+              fetchStoneCountAndCreateSpiral();
+            }
+          });
+
+          markerEl.addEventListener('markerLost', () => {
+            console.log('[iOS AR] markerLost');
+            statusEl.textContent = 'Marker verloren…';
+          });
+        },
+
+        // Wird jedes Frame aufgerufen → Animation wie bei Android
+        tick: function (time, timeDelta) {
+          const stones = this.stones;
+          if (!stones || stones.length === 0) return;
+
+          const t = time / 1000; // ms → Sekunden
+
+          stones.forEach((stone, index) => {
+            const baseAngle = stone.userData.baseAngle;
+            const radius = stone.userData.radius;
+            const baseHeight = stone.userData.baseHeight;
+
+            const speed = 0.2 + radius * 0.1;
+            const angle = baseAngle + t * speed;
+
+            const x = Math.cos(angle) * radius;
+            const z = Math.sin(angle) * radius;
+            const y =
+              baseHeight + Math.sin(t * 2 + index * 0.3) * 0.01; // leichtes Wabern
+
+            stone.position.set(x, y, z);
+            stone.rotation.y += 0.01;
+          });
+        }
       });
     </script>
   </body>
 </html>
+
+
 
 
 
