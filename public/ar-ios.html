@@ -48,13 +48,13 @@
     }
   </style>
 
-  <!-- A-Frame + AR.js von offiziellen CDNs -->
+  <!-- A-Frame + AR.js -->
   <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.3/aframe/build/aframe-ar.js"></script>
 </head>
 <body>
   <header>
-    Halte die Kamera auf den Hiro-Marker (schwarz-weißes Block-Muster), dann erscheint der Steine-Strudel.
+    Halte die Kamera auf den Hiro-Marker (schwarz-weißes Block-Muster), dann sollte der gelbe Würfel + Strudel erscheinen.
   </header>
   <div id="debug">[debug] Seite geladen…</div>
 
@@ -63,12 +63,17 @@
     embedded
     vr-mode-ui="enabled: false"
     renderer="logarithmicDepthBuffer: true; antialias: true; alpha: true;"
-    arjs="sourceType: webcam; detectionMode: mono; debugUIEnabled: true;"
+    arjs="sourceType: webcam; debugUIEnabled: true;"
   >
-    <!-- Marker: Standard „hiro“ -->
-    <a-marker preset="hiro" spiral-stones>
-      <!-- Root-Entity für den Strudel -->
-      <a-entity id="spiral-root"></a-entity>
+    <!-- Marker: Standard „hiro“ mit Events -->
+    <a-marker
+      preset="hiro"
+      emitevents="true"
+      id="hiroMarker"
+      spiral-stones
+    >
+      <!-- Root für A-Frame-Entitäten (falls du später willst) -->
+      <a-entity id="spiral-root-entity"></a-entity>
     </a-marker>
 
     <!-- Standard-Kamera -->
@@ -76,7 +81,7 @@
   </a-scene>
 
   <script>
-    // ---------- kleines Debug-Overlay ----------
+    // ---------- Debug-Overlay ----------
     const debugEl = document.getElementById('debug');
     function logDebug(msg) {
       console.log('[iOS AR]', msg);
@@ -87,12 +92,9 @@
     }
 
     logDebug('AFRAME vorhanden? ' + !!window.AFRAME);
-    // ------------------------------------------
+    // -----------------------------------
 
-    // ---------- Strudel-Komponente ----------
-    // iOS-Version: Boxen statt GLB, damit wir nicht auch noch mit GLTF auf iOS kämpfen.
-    // Die Anzahl der Steine wird hier im Code gesetzt – später kannst du wieder
-    // deinen stoneCount-API-Call einbauen.
+    // ---------- Strudel + Debug-Würfel ----------
     AFRAME.registerComponent('spiral-stones', {
       schema: {},
 
@@ -105,10 +107,8 @@
 
         this.stones = [];
 
-        // *** HIER die Anzahl der Steine setzen ***
-        // Wenn du den globalen stoneCount (z.B. 83) testen willst, trag ihn hier ein:
-        const stoneCount = 80; // TEST: einfach mal 80 Steine
-
+        // TEST: feste Anzahl an Steinen (Später = stoneCount aus API)
+        const stoneCount = 80;
         logDebug('Erzeuge Strudel mit stoneCount=' + stoneCount);
 
         const angleStepDeg = 15;
@@ -135,7 +135,6 @@
           stone.position.set(x, y, z);
           stone.rotation.y = (Math.random() - 0.5) * Math.PI;
 
-          // Animationsdaten
           stone.userData.baseAngle = angleRad;
           stone.userData.radius = radius;
           stone.userData.baseHeight = y;
@@ -147,7 +146,17 @@
           radius += radiusStep;
         }
 
-        // bisschen skalieren, sonst zu klein
+        // fetter gelber Debug-Würfel mitten auf dem Marker,
+        // damit du SOFORT siehst, ob der Marker überhaupt tracked:
+        const debugGeom = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+        const debugMat = new THREE.MeshStandardMaterial({
+          color: 0xffff00
+        });
+        const debugCube = new THREE.Mesh(debugGeom, debugMat);
+        debugCube.position.set(0, 0.1, 0); // leicht über dem Marker
+        this.root.add(debugCube);
+
+        // Strudel verkleinern, damit er nicht zu riesig ist
         this.root.scale.set(0.3, 0.3, 0.3);
 
         logDebug('Strudel erstellt, Stones=' + this.stones.length);
@@ -176,13 +185,25 @@
       }
     });
 
-    // Szene-Events loggen
-    document.addEventListener('DOMContentLoaded', () => {
-      logDebug('DOMContentLoaded');
-    });
-
+    // Marker-Events loggen
     window.addEventListener('load', () => {
       logDebug('window.load');
+
+      const marker = document.getElementById('hiroMarker');
+      if (!marker) {
+        logDebug('Kein #hiroMarker gefunden!');
+        return;
+      }
+
+      marker.addEventListener('markerFound', () => {
+        logDebug('markerFound (Hiro erkannt)');
+      });
+
+      marker.addEventListener('markerLost', () => {
+        logDebug('markerLost (Hiro verloren)');
+      });
+
+      logDebug('Marker-Events registriert.');
     });
 
     // A-Frame Scene-Event
@@ -192,6 +213,7 @@
   </script>
 </body>
 </html>
+
 
 
 
