@@ -29,13 +29,13 @@
     }
   </style>
 
-  <!-- A-Frame + AR.js (kostenlos, kein App-Key) -->
+  <!-- A-Frame + AR.js (kein WebXR, kein App-Key) -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.6/aframe/build/aframe-ar.min.js"></script>
 </head>
 <body>
   <div id="info">
-    Halte die Kamera auf den <b>Hiro-Marker</b> (Schwarz-Weiß-Block-Muster), dann erscheint der Steine-Strudel.
+    Halte die Kamera auf den <b>Hiro-Marker</b> (schwarz-weißes Block-Muster), dann erscheint der Steine-Strudel.
   </div>
 
   <!-- AR.js Szene -->
@@ -45,40 +45,34 @@
     renderer="logarithmicDepthBuffer: true; antialias: true; alpha: true"
     arjs="sourceType: webcam; debugUIEnabled: false;"
   >
-    <!-- Dein Steinmodell (Stone.glb) – liegt im gleichen Ordner wie bei Android: ./assets/models/Stone.glb -->
     <a-assets>
+      <!-- Gleiche Stone.glb wie Android -->
       <a-asset-item id="stoneModel" src="./assets/models/Stone.glb"></a-asset-item>
     </a-assets>
 
-    <!-- Marker: wir nutzen das Standard-Hiro-Muster -->
+    <!-- Hiro-Marker -->
     <a-marker id="marker" preset="hiro">
-      <!-- Hier hängen wir den Strudel dran -->
       <a-entity id="strudelRoot" scale="0.3 0.3 0.3"></a-entity>
     </a-marker>
 
-    <!-- Kamera -->
     <a-entity camera></a-entity>
   </a-scene>
 
   <script>
     (function () {
-      // Gleiche API wie Android: POST /api/stone-count
       const STONECOUNT_ENDPOINT = '/api/stone-count';
 
       const marker = document.getElementById('marker');
       const root   = document.getElementById('strudelRoot');
 
-      let stoneCountForSpiral = 60;  // Default
-      let strudelCreated = false;    // nur einmal bauen
+      let stoneCountForSpiral = 60;
+      let strudelCreated = false;
 
-      // 1) Counter erhöhen + aktuellen stoneCount vom Backend holen
       async function incrementAndLoadStoneCount() {
         try {
           const res = await fetch(STONECOUNT_ENDPOINT, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reason: 'ios-marker-ar-start' })
           });
 
@@ -91,19 +85,16 @@
           if (typeof data.stoneCount === 'number') {
             stoneCountForSpiral = data.stoneCount;
           }
-
           console.log('[iOS] stoneCount vom Server:', stoneCountForSpiral);
         } catch (err) {
           console.error('[iOS] Fehler bei /api/stone-count:', err);
         }
       }
 
-      // 2) Strudel bauen (Spirale aus Stone.glb-Klonen)
       function createStrudel() {
         if (strudelCreated) return;
         strudelCreated = true;
 
-        // 1:1 mit Deinem globalen Counter, aber etwas gecappt
         const stoneCount = Math.max(1, Math.min(stoneCountForSpiral, 500));
         console.log('[iOS] Strudel wird gebaut mit', stoneCount, 'Steinen.');
 
@@ -131,17 +122,14 @@
           radius   += radiusStep;
         }
 
-        // kompletter Strudel rotiert → "wirbelnder" Effekt wie auf Android
         root.setAttribute(
           'animation',
           'property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear'
         );
       }
 
-      // 3) Wenn der Marker das erste Mal erkannt wird → Counter++ & Strudel bauen
       marker.addEventListener('markerFound', () => {
         if (strudelCreated) return;
-
         console.log('[iOS] Marker gefunden → Counter++ & Strudel aufbauen');
         incrementAndLoadStoneCount().then(createStrudel);
       });
@@ -149,6 +137,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 
