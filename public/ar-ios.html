@@ -32,108 +32,218 @@
       max-width: 90vw;
     }
 
-    model-viewer {
-      width: 100vw;
-      height: 100vh;
-      outline: none;
-    }
-
-    /* eigener AR-Button */
-    .ar-btn {
-      background: #ffffff;
-      color: #000000;
-      border: none;
-      border-radius: 999px;
-      padding: 10px 20px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
+    .marker-hint {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.6);
+      padding: 6px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      z-index: 10;
+      text-align: center;
+      max-width: 90vw;
     }
   </style>
 
-  <!-- model-viewer Web Component -->
-  <script
-    type="module"
-    src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
-  </script>
+  <!-- A-Frame + AR.js (A-Frame-Build) -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
 </head>
 <body>
   <header>
-    Tippe unten auf „In AR ansehen“, um den Steine-Strudel im Raum zu platzieren.
+    Richte die Kamera auf den Marker, um den Steine-Strudel zu sehen.
   </header>
 
-  <model-viewer
-    id="stone-strudel-viewer"
-    src="./assets/models/Stone.glb"
-    ios-src="./assets/models/Stone.usdz"
-    alt="Steine-Strudel als 3D-Modell"
-    ar
-    ar-modes="quick-look scene-viewer webxr"
-    camera-controls
-    auto-rotate
-    autoplay
-    environment-image="neutral"
+  <div class="marker-hint">
+    Benutze den klassischen <strong>Hiro-Marker</strong> (schwarz-weißes AR-Pattern).
+  </div>
+
+  <!-- AR.js / A-Frame Szene -->
+  <a-scene
+    embedded
+    vr-mode-ui="enabled: false"
+    renderer="logarithmicDepthBuffer: true; antialias: true;"
+    arjs="sourceType: webcam; debugUIEnabled: false;"
   >
-    <!-- eigener AR-Button -->
-    <button slot="ar-button" class="ar-btn">
-      In AR ansehen
-    </button>
-  </model-viewer>
+    <!-- Assets -->
+    <a-assets>
+      <!-- dein Stein-Modell -->
+      <a-asset-item id="stone-gltf" src="./assets/models/Stone.glb"></a-asset-item>
+    </a-assets>
+
+    <!-- Marker (Hiro) -->
+    <a-marker type="hiro">
+      <!-- Template-Stein, wird nur als Vorlage benutzt -->
+      <a-entity
+        id="stone-template"
+        gltf-model="#stone-gltf"
+        visible="false">
+      </a-entity>
+
+      <!-- hier hängt der Strudel dran -->
+      <a-entity id="stone-root" stone-spiral-loader></a-entity>
+    </a-marker>
+
+    <!-- Kamera -->
+    <a-entity camera></a-entity>
+  </a-scene>
 
   <script>
-    // >>> HIER ggf. anpassen: gleiche URL wie in main-android.js <<<
-    const STONE_COUNT_ENDPOINT = '/api/increment-stone-count';
-    // z.B. '/api/stone-count' wenn du Kebab-Case nutzt
+    // ---- HILFSFUNKTION: Strudel erzeugen & animieren (wie Android) ----
+    function createStoneSpiral(rootObject3D, stoneMesh, stoneCountFromAPI) {
+      const group = new THREE.Group();
+      const stones = [];
 
-    const viewer = document.getElementById('stone-strudel-viewer');
+      // Anzahl Steine -> 1:1 aus API, aber etwas begrenzt
+      const stoneCount = Math.max(1, Math.min(stoneCountFromAPI, 500));
 
-    let stoneCountAlreadyIncremented = false;
+      const angleStepDeg = 15;
+      const radiusStep = 0.03;
+      const randomHeight = 0.01;
 
-    function incrementStoneCountOnce() {
-      if (stoneCountAlreadyIncremented) return;
-      stoneCountAlreadyIncremented = true;
+      let angleRad = 0;
+      let radius = 0;
+      const angleStepRad = (angleStepDeg * Math.PI) / 180;
 
-      fetch(STONE_COUNT_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ reason: 'ios-ar-start' })
-      })
-        .then((res) => {
-          if (!res.ok) {
-            throw new Error('HTTP ' + res.status);
+      for (let i = 0; i < stoneCount; i++) {
+        // Deep-Klon vom Stone-Mesh
+        const stone = stoneMesh.clone(true);
+
+        stone.traverse((n) => {
+          if (n.isMesh) {
+            n.castShadow = true;
+            n.receiveShadow = true;
           }
-          return res.json().catch(() => null);
-        })
-        .then((data) => {
-          console.log('[iOS] stoneCount increment result:', data);
-        })
-        .catch((err) => {
-          console.error('[iOS] stoneCount increment failed:', err);
         });
+
+        const x = Math.cos(angleRad) * radius;
+        const z = Math.sin(angleRad) * radius;
+        const y = (Math.random() - 0.5) * 2 * randomHeight;
+
+        // Basisposition
+        stone.position.set(x, y, z);
+        stone.rotation.y = (Math.random() - 0.5) * Math.PI;
+
+        // Daten für Animation speichern
+        stone.userData.baseAngle = angleRad;
+        stone.userData.radius = radius;
+        stone.userData.baseHeight = y;
+
+        group.add(stone);
+        stones.push(stone);
+
+        angleRad += angleStepRad;
+        radius += radiusStep;
+      }
+
+      // Strudel etwas kleiner machen
+      group.scale.set(0.3, 0.3, 0.3);
+
+      // Strudel an Marker-Root hängen
+      rootObject3D.add(group);
+
+      console.log('[iOS AR] Strudel erzeugt mit', stoneCount, 'Steinen.');
+
+      // Animation wie auf Android
+      function animate() {
+        const t = performance.now() / 1000; // Sekunden
+
+        stones.forEach((stone, index) => {
+          const baseAngle = stone.userData.baseAngle;
+          const radius = stone.userData.radius;
+          const baseHeight = stone.userData.baseHeight;
+
+          const speed = 0.2 + radius * 0.1; // außen schneller
+          const angle = baseAngle + t * speed;
+
+          const x = Math.cos(angle) * radius;
+          const z = Math.sin(angle) * radius;
+          const y = baseHeight + Math.sin(t * 2 + index * 0.3) * 0.01;
+
+          stone.position.set(x, y, z);
+          stone.rotation.y += 0.01;
+        });
+
+        requestAnimationFrame(animate);
+      }
+
+      animate();
     }
 
-    if (viewer) {
-      // WebXR / Scene Viewer etc.
-      viewer.addEventListener('ar-status', (event) => {
-        const status = event.detail && event.detail.status;
-        console.log('[iOS model-viewer] ar-status:', status);
+    // ---- A-Frame-Component: holt stoneCount + lädt Stein-Modell ----
+    AFRAME.registerComponent('stone-spiral-loader', {
+      init: function () {
+        const el = this.el;
+        const sceneEl = el.sceneEl;
 
-        // Wenn AR-Session wirklich gestartet ist → einmal erhöhen
-        if (status === 'session-started') {
-          incrementStoneCountOnce();
-        }
-      });
+        console.log('[iOS AR] stone-spiral-loader init');
 
-      // iOS Quick Look (typischer Fall auf iPhone)
-      viewer.addEventListener('quick-look-button-tapped', () => {
-        console.log('[iOS model-viewer] Quick Look gestartet');
-        incrementStoneCountOnce();
-      });
-    }
+        // Template-Stein (unsichtbar)
+        const stoneTemplateEl = sceneEl.querySelector('#stone-template');
+
+        // Promise, die erfüllt wird, wenn das Modell geladen ist
+        const stoneMeshPromise = new Promise((resolve) => {
+          if (stoneTemplateEl.getObject3D('mesh')) {
+            console.log('[iOS AR] Stone-Template bereits geladen.');
+            resolve(stoneTemplateEl.getObject3D('mesh'));
+          } else {
+            stoneTemplateEl.addEventListener(
+              'model-loaded',
+              () => {
+                console.log('[iOS AR] Stone-Template model-loaded.');
+                resolve(stoneTemplateEl.getObject3D('mesh'));
+              },
+              { once: true }
+            );
+          }
+        });
+
+        // STEP 1: stoneCount via API holen (+1 pro Aufruf)
+        const stoneCountPromise = fetch('/api/stone-count', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ reason: 'ios-ar-start' })
+        })
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error('HTTP ' + res.status);
+            }
+            return res.json();
+          })
+          .then((data) => {
+            let sc = 60;
+            if (data && typeof data.stoneCount === 'number') {
+              sc = data.stoneCount;
+            }
+            console.log('[iOS AR] stoneCount aus API =', sc);
+            return sc;
+          })
+          .catch((err) => {
+            console.error('[iOS AR] Fehler bei /api/stone-count:', err);
+            // Fallback
+            return 60;
+          });
+
+        // STEP 2: Wenn BOTH (stoneMesh + stoneCount) da sind → Strudel bauen
+        Promise.all([stoneMeshPromise, stoneCountPromise]).then(
+          ([stoneMesh, stoneCount]) => {
+            if (!stoneMesh) {
+              console.error('[iOS AR] Kein Stone-Mesh vorhanden, kann Strudel nicht bauen.');
+              return;
+            }
+            createStoneSpiral(el.object3D, stoneMesh, stoneCount);
+          }
+        );
+      }
+    });
   </script>
 </body>
 </html>
+
+
 
 
