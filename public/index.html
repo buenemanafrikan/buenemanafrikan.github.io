@@ -17,9 +17,6 @@
       min-height: 100vh;
       padding: 16px;
     }
-    .hidden {
-      display: none;
-    }
   </style>
 </head>
 <body>
@@ -31,23 +28,44 @@
   <script>
     (function () {
       const ua = navigator.userAgent || navigator.vendor || window.opera;
+      const params = new URLSearchParams(window.location.search);
+      const force = params.get('force');
+
+      console.log('[index] userAgent:', ua, 'force=', force);
 
       const isIOS =
-        /iPad|iPhone|iPod/.test(ua) ||
+        /iPad|iPhone|iPod/i.test(ua) ||
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
       const isAndroid = /Android/i.test(ua);
 
-      if (isIOS) {
-        window.location.replace('ar-ios.html');
+      let target = null;
+
+      if (force === 'ios') {
+        target = 'ar-ios.html';
+      } else if (force === 'android') {
+        target = 'ar-android.html';
+      } else if (isIOS) {
+        target = 'ar-ios.html';
       } else if (isAndroid) {
-        window.location.replace('ar-android.html');
+        target = 'ar-android.html';
+      }
+
+      const msgEl = document.getElementById('message');
+
+      if (target) {
+        msgEl.innerHTML =
+          '<p>Weiterleitung auf <code>' + target + '</code>…</p>';
+        console.log('[index] Redirect zu', target);
+        window.location.replace(target);
       } else {
-        // Desktop oder etwas anderes → einfach Info stehen lassen
-        document.getElementById('message').innerHTML =
+        msgEl.innerHTML =
           '<p>Bitte mit einem Smartphone (Android oder iPhone) öffnen.</p>';
+        console.log('[index] Kein mobiles Gerät erkannt');
       }
     })();
   </script>
 </body>
 </html>
+
+
