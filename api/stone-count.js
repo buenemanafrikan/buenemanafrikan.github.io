@@ -1,27 +1,26 @@
 // api/stone-count.js
 //
 // POST  → globalen Aufrufzähler "pressCount" in Upstash-KV erhöhen (+1)
-//        und daraus stoneCount = 30 + pressCount berechnen.
+//        und daraus stoneCount = baseStones + pressCount berechnen.
 // GET   → aktuellen pressCount lesen (ohne zu erhöhen) und ebenfalls
-//        stoneCount = 30 + pressCount zurückgeben.
+//        stoneCount = baseStones + pressCount zurückgeben.
+//
+// WICHTIG: Mit CORS-Headern, damit 8th Wall (andere Domain) zugreifen darf.
 //
 // ENV-Variablen:
 //   KV_REST_API_URL
 //   KV_REST_API_TOKEN
 
-const numberOfStones = 200;
-
 export default async function handler(req, res) {
-  // --- CORS, damit 8th Wall (andere Domain) zugreifen darf ---
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // ---------- CORS für 8th Wall & Browser ----------
+  res.setHeader('Access-Control-Allow-Origin', '*'); // oder spezifische Domain
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
-    // Preflight-Request vom Browser
     return res.status(200).end();
   }
-  // ------------------------------------------------------------
+  // -------------------------------------------------
 
   const url = process.env.KV_REST_API_URL;
   const token = process.env.KV_REST_API_TOKEN;
@@ -30,6 +29,8 @@ export default async function handler(req, res) {
     console.error('KV_REST_API_URL oder KV_REST_API_TOKEN fehlt');
     return res.status(500).json({ error: 'KV config missing' });
   }
+
+  const baseStones = 30; // dein Basiswert
 
   if (req.method === 'POST') {
     // ---------------------------
@@ -47,19 +48,16 @@ export default async function handler(req, res) {
       let pressCount;
 
       try {
-        // Normalfall Upstash: { "result": <number> }
-        const parsed = JSON.parse(bodyText);
+        const parsed = JSON.parse(bodyText); // normal: { "result": <number> }
         pressCount = parsed.result;
       } catch (_e) {
-        // Fallback, falls mal nur "42" kommt
-        pressCount = Number(bodyText);
+        pressCount = Number(bodyText); // Fallback
       }
 
       if (!Number.isFinite(pressCount)) {
         throw new Error('Ungültige Antwort von Upstash: ' + bodyText);
       }
 
-      const baseStones = 30; // deine aktuellen Basis-Steine
       const stoneCount = baseStones + pressCount;
 
       console.log('[API POST] pressCount =', pressCount, '→ stoneCount =', stoneCount);
@@ -86,7 +84,6 @@ export default async function handler(req, res) {
 
       try {
         const parsed = JSON.parse(bodyText);
-        // Upstash: { "result": null } wenn key nicht existiert
         if (parsed && parsed.result != null) {
           pressCount = Number(parsed.result);
         } else {
@@ -97,11 +94,9 @@ export default async function handler(req, res) {
       }
 
       if (!Number.isFinite(pressCount)) {
-        // falls key nie gesetzt wurde o.Ä. → einfach 0
         pressCount = 0;
       }
 
-      const baseStones = 30;
       const stoneCount = baseStones + pressCount;
 
       console.log('[API GET] pressCount =', pressCount, '→ stoneCount =', stoneCount);
@@ -112,7 +107,6 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'KV error' });
     }
   } else {
-    // nur GET und POST erlauben
     res.setHeader('Allow', ['GET', 'POST', 'OPTIONS']);
     return res.status(405).json({ error: 'Method not allowed' });
   }
