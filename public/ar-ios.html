@@ -3,140 +3,190 @@
 <head>
   <meta charset="UTF-8" />
   <title>Stone Spiral AR – iOS (Marker)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
+  />
 
   <style>
+    html,
     body {
       margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
       overflow: hidden;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
       background: #000;
-      color: #fff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
-    #info {
+    header {
       position: fixed;
       top: 10px;
       left: 50%;
       transform: translateX(-50%);
       background: rgba(0, 0, 0, 0.6);
+      color: #fff;
       padding: 6px 12px;
       border-radius: 12px;
       font-size: 12px;
-      z-index: 10;
-      max-width: 90vw;
+      z-index: 5;
       text-align: center;
+      max-width: 90vw;
+    }
+
+    a-scene {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
     }
   </style>
 
-  <!-- A-Frame + AR.js (kein WebXR, kein App-Key) -->
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.6/aframe/build/aframe-ar.min.js"></script>
+  <!-- A-Frame + AR.js (Marker-basiert, kein WebXR) -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
 </head>
 <body>
-  <div id="info">
-    Halte die Kamera auf den <b>Hiro-Marker</b> (schwarz-weißes Block-Muster), dann erscheint der Steine-Strudel.
-  </div>
+  <header>
+    Halte die Kamera auf den Hiro-Marker (schwarz-weißes Block-Muster),
+    dann erscheint der Steine-Strudel.
+  </header>
 
   <!-- AR.js Szene -->
   <a-scene
     embedded
     vr-mode-ui="enabled: false"
-    renderer="logarithmicDepthBuffer: true; antialias: true; alpha: true"
-    arjs="sourceType: webcam; debugUIEnabled: false;"
+    renderer="logarithmicDepthBuffer: true; alpha: true; antialias: true;"
+    arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
   >
-    <a-assets>
-      <!-- Gleiche Stone.glb wie Android -->
-      <a-asset-item id="stoneModel" src="./assets/models/Stone.glb"></a-asset-item>
-    </a-assets>
+    <!-- Licht -->
+    <a-entity
+      light="type: hemisphere; intensity: 1; color: #ffffff; groundColor: #444444"
+    ></a-entity>
+    <a-entity
+      light="type: directional; intensity: 0.7"
+      position="1 2 1"
+    ></a-entity>
 
-    <!-- Hiro-Marker -->
-    <a-marker id="marker" preset="hiro">
-      <a-entity id="strudelRoot" scale="0.3 0.3 0.3"></a-entity>
+    <!-- Marker: Hiro -->
+    <a-marker preset="hiro">
+      <!-- Hier hängt unser Strudel dran -->
+      <a-entity id="spiral-root" spiral-stones></a-entity>
     </a-marker>
 
+    <!-- Kamera -->
     <a-entity camera></a-entity>
   </a-scene>
 
   <script>
-    (function () {
-      const STONECOUNT_ENDPOINT = '/api/stone-count';
+    // A-Frame Komponente für den Steine-Strudel
+    AFRAME.registerComponent('spiral-stones', {
+      init: function () {
+        this.stones = [];
+        this.loaded = false;
+        this.createSpiralFromApi();
+      },
 
-      const marker = document.getElementById('marker');
-      const root   = document.getElementById('strudelRoot');
+      // Holt stoneCount vom Backend (gleiche API wie Android) und baut den Strudel
+      createSpiralFromApi: async function () {
+        const root = this.el.object3D;
+        let stoneCount = 60; // Fallback
 
-      let stoneCountForSpiral = 60;
-      let strudelCreated = false;
-
-      async function incrementAndLoadStoneCount() {
         try {
-          const res = await fetch(STONECOUNT_ENDPOINT, {
+          const res = await fetch('/api/stone-count', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reason: 'ios-marker-ar-start' })
+            body: JSON.stringify({ reason: 'ios-ar-start' })
           });
 
-          if (!res.ok) {
-            console.error('[iOS] /api/stone-count Status:', res.status);
-            return;
+          if (res.ok) {
+            const data = await res.json();
+            if (typeof data.stoneCount === 'number') {
+              stoneCount = data.stoneCount;
+            }
+            console.log('[iOS AR] stoneCount aus API =', stoneCount);
+          } else {
+            console.warn('[iOS AR] /api/stone-count HTTP', res.status);
           }
-
-          const data = await res.json();
-          if (typeof data.stoneCount === 'number') {
-            stoneCountForSpiral = data.stoneCount;
-          }
-          console.log('[iOS] stoneCount vom Server:', stoneCountForSpiral);
-        } catch (err) {
-          console.error('[iOS] Fehler bei /api/stone-count:', err);
+        } catch (e) {
+          console.error('[iOS AR] Fehler bei fetch /api/stone-count:', e);
         }
-      }
 
-      function createStrudel() {
-        if (strudelCreated) return;
-        strudelCreated = true;
-
-        const stoneCount = Math.max(1, Math.min(stoneCountForSpiral, 500));
-        console.log('[iOS] Strudel wird gebaut mit', stoneCount, 'Steinen.');
+        // Begrenzen, damit iOS nicht stirbt
+        stoneCount = Math.max(1, Math.min(stoneCount, 400));
 
         const angleStepDeg = 15;
-        const radiusStep   = 0.03;
+        const radiusStep = 0.03;
         const randomHeight = 0.01;
 
+        const geom = new THREE.BoxGeometry(0.04, 0.025, 0.06);
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0x777777,
+          roughness: 0.9,
+          metalness: 0.1
+        });
+
         let angleRad = 0;
-        let radius   = 0;
-        const angleStepRad = angleStepDeg * Math.PI / 180;
+        let radius = 0;
+        const angleStepRad = THREE.MathUtils.degToRad(angleStepDeg);
 
         for (let i = 0; i < stoneCount; i++) {
           const x = Math.cos(angleRad) * radius;
           const z = Math.sin(angleRad) * radius;
           const y = (Math.random() - 0.5) * 2 * randomHeight;
 
-          const stone = document.createElement('a-entity');
-          stone.setAttribute('gltf-model', '#stoneModel');
-          stone.setAttribute('position', x + ' ' + y + ' ' + z);
-          stone.setAttribute('rotation', '0 ' + (Math.random() * 360) + ' 0');
+          const stone = new THREE.Mesh(geom, mat);
 
-          root.appendChild(stone);
+          stone.position.set(x, y, z);
+          stone.rotation.y = (Math.random() - 0.5) * Math.PI;
+
+          stone.userData.baseAngle = angleRad;
+          stone.userData.radius = radius;
+          stone.userData.baseHeight = y;
+
+          root.add(stone);
+          this.stones.push(stone);
 
           angleRad += angleStepRad;
-          radius   += radiusStep;
+          radius += radiusStep;
         }
 
-        root.setAttribute(
-          'animation',
-          'property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear'
-        );
-      }
+        this.loaded = true;
+        console.log('[iOS AR] Spiral erstellt mit', this.stones.length, 'Steinen.');
+      },
 
-      marker.addEventListener('markerFound', () => {
-        if (strudelCreated) return;
-        console.log('[iOS] Marker gefunden → Counter++ & Strudel aufbauen');
-        incrementAndLoadStoneCount().then(createStrudel);
-      });
-    })();
+      // Animation (wie Android – Strudel dreht sich & wabert)
+      tick: function (time, timeDelta) {
+        if (!this.loaded || !this.stones || this.stones.length === 0) return;
+
+        const t = time / 1000;
+
+        this.stones.forEach((stone, index) => {
+          const baseAngle = stone.userData.baseAngle;
+          const radius = stone.userData.radius;
+          const baseHeight = stone.userData.baseHeight;
+
+          const speed = 0.2 + radius * 0.1;
+          const angle = baseAngle + t * speed;
+
+          const x = Math.cos(angle) * radius;
+          const z = Math.sin(angle) * radius;
+          const y =
+            baseHeight + Math.sin(t * 2 + index * 0.3) * 0.01;
+
+          stone.position.set(x, y, z);
+          stone.rotation.y += 0.01;
+        });
+      }
+    });
   </script>
 </body>
 </html>
+
+
 
 
 
