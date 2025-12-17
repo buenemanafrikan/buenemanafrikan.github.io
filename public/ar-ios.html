@@ -160,9 +160,20 @@
               radius += radiusStep;
             }
 
-            // Strudel etwas skalieren, damit er gut über dem Marker hängt
+            // --- ORIENTIERUNG & POSITION WIE GEWÜNSCHT ---
+
+            // etwas skalieren
             group.scale.set(0.4, 0.4, 0.4);
-            group.position.set(0, 0, 0); // direkt auf Marker-Zentrum
+
+            // leicht über den Marker heben
+            group.position.set(0, 0.15, 0);
+
+            // Strudel "aufstellen": vorher flach, jetzt senkrecht wie auf Android
+            // wenn er falsch herum steht, einfach Vorzeichen wechseln:
+            // group.rotation.x = Math.PI / 2;
+            group.rotation.x = -Math.PI / 2;
+
+            // -------------------------------------------
 
             // An den Marker hängen
             const markerObj = markerEl.object3D;
@@ -219,6 +230,7 @@
     </script>
   </body>
 </html>
+
 
 
 
