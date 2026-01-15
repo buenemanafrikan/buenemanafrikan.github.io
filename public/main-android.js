@@ -97,7 +97,7 @@ function init() {
   // Modell laden
   const loader = new GLTFLoader();
   loader.load(
-    './assets/models/Stone.glb',
+    './assets/models/Sandstone.glb',
     (gltf) => {
       stoneModel = gltf.scene;
 
@@ -305,4 +305,5 @@ function render(timestamp /*, frame*/) {
 
   renderer.render(scene, camera);
 }
+
 
